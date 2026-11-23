@@ -1,0 +1,26 @@
+# Private workspace files: never published
+/.claude/
+/docs/
+/notes/
+/READMEforUS.md
+
+# Swift Package Manager and Xcode
+.build/
+.swiftpm/
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+# Editors and OS
+.vscode/
+.DS_Store
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Raw media (processed route videos are published separately)
+/media/raw/
+*.mov
