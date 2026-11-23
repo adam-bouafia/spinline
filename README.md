@@ -30,8 +30,8 @@ Early development. The protocol, physics and workout layers come first, because 
 | Milestone | Scope | State |
 |---|---|---|
 | M0 | Repository, packages, toolchain, CI | done |
-| M1 | TrainerKit: FTMS and heart-rate codecs | in progress |
-| M2 | RideEngine: ride physics, workouts, video rate | planned |
+| M1 | TrainerKit: FTMS and heart-rate codecs | done |
+| M2 | RideEngine: ride physics, workouts, video rate | in progress |
 | M3 | Virtual trainer and a command-line ride | planned |
 | M4 | SwiftUI app built and tested in CI (iOS simulator) | planned |
 | M5 | CoreBluetooth adapter for real trainers | planned |
@@ -152,10 +152,31 @@ Spinline talks to trainers through the Fitness Machine Service as defined in the
 
 All values are little-endian. Indoor Bike Data starts with a 16-bit flags field; each set flag adds a field in a fixed order. The codecs are pure functions over byte arrays and are tested against byte fixtures, so the protocol is verified without a radio.
 
+TrainerKit implements:
+
+| Type | Characteristic | Direction |
+|---|---|---|
+| `IndoorBikeData` | Indoor Bike Data | decode and encode, all 13 fields |
+| `ControlPointCommand` | Fitness Machine Control Point | encode (client) and decode (virtual trainer) |
+| `ControlPointResponse` | Fitness Machine Control Point | decode and encode |
+| `FitnessMachineFeature` | Fitness Machine Feature | decode and encode |
+| `FitnessMachineStatus` | Fitness Machine Status | decode and encode |
+| `SupportedPowerRange` | Supported Power Range | decode and encode, nearest valid ERG target |
+| `HeartRateMeasurement` | Heart Rate Measurement | decode and encode, 8 and 16-bit values, RR intervals |
+
+Points where the specifications disagree, and what the code does:
+
+- **Resistance Level in Indoor Bike Data.** FTMS v1.0 refers to a 2-byte `sint16`; the GATT Specification Supplement of 2026 lists a 1-byte `uint8`. All other fields have fixed sizes, so the packet length tells the two apart, and the decoder accepts both.
+- **Instantaneous Cadence flag.** Table 4.10 of FTMS v1.0 prints bit 2 inverted; the GATT Specification Supplement says bit 2 set means cadence is present, which is what the code follows.
+- **Padding.** Bytes after the last announced field are ignored, because some implementations append them. Control point writes, decoded by the virtual trainer, are strict: a wrong parameter size is an error.
+
+Decoders never crash on bad input: a test feeds every decoder 20,000 random packets from a seeded generator.
+
 ## Testing
 
 - Swift Testing (`@Test`, `#expect`, parameterised arguments) in every package.
-- Codecs are tested with byte fixtures and encode-decode round trips; malformed packets must throw.
+- Codecs are tested with byte fixtures worked out by hand from the specification tables, encode-decode round trips, and malformed packets that must throw.
+- Random packets from a seeded generator check that no decoder can crash on radio input.
 - View models are tested on Linux against the virtual trainer (from M4).
 - UI tests run on an iOS simulator in CI and record screenshots and a short video (from M4).
 
