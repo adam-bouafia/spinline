@@ -17,6 +17,7 @@ Spinline is built on public Bluetooth SIG specifications (Fitness Machine Servic
 - [Repository layout](#repository-layout)
 - [Getting started](#getting-started)
 - [Bluetooth protocol](#bluetooth-protocol)
+- [Ride engine](#ride-engine)
 - [Testing](#testing)
 - [Continuous integration](#continuous-integration)
 - [Branching and releases](#branching-and-releases)
@@ -31,8 +32,8 @@ Early development. The protocol, physics and workout layers come first, because 
 |---|---|---|
 | M0 | Repository, packages, toolchain, CI | done |
 | M1 | TrainerKit: FTMS and heart-rate codecs | done |
-| M2 | RideEngine: ride physics, workouts, video rate | in progress |
-| M3 | Virtual trainer and a command-line ride | planned |
+| M2 | RideEngine: ride physics, workouts, video rate | done |
+| M3 | Virtual trainer and a command-line ride | in progress |
 | M4 | SwiftUI app built and tested in CI (iOS simulator) | planned |
 | M5 | CoreBluetooth adapter for real trainers | planned |
 | M6 | Route video synced to the rider's speed | planned |
@@ -172,11 +173,33 @@ Points where the specifications disagree, and what the code does:
 
 Decoders never crash on bad input: a test feeds every decoder 20,000 random packets from a seeded generator.
 
+## Ride engine
+
+`RideEngine` is pure Swift and has no knowledge of Bluetooth or the screen.
+
+**Physics.** Pedal power moves rider and bike against rolling resistance, gravity and air drag:
+
+```
+P * efficiency = v * (m * g * (Crr * cos(a) + sin(a)) + 0.5 * rho * CdA * v^2)
+```
+
+`CyclingPhysics.steadySpeed(power:grade:)` solves it for speed by bisection; with the defaults (83 kg, Crr 0.004, CdA 0.32 m^2, efficiency 0.97) 200 W on the flat holds 33.9 km/h. `RideSimulator` adds inertia by integrating kinetic energy, which stays stable at zero speed, stops on a climb without rolling back, and starts rolling on a descent steeper than the rolling resistance.
+
+**Workouts.** A `Workout` is a list of steps with targets as fractions of FTP (steady, ramp or free ride), read from JSON with `repeat` blocks for intervals. `WorkoutPlan` resolves it for a rider into a timeline with the target in watts at any second. `ErgTargetTracker` decides when a new ERG target goes to the trainer: only on a change, at most once a second, never dropping a step change.
+
+**Video sync.** `RouteIndex` maps each second of a route video to the distance along the route and the gradient. `VideoSync` turns the rider's virtual distance and speed into a player command every tick:
+
+- base rate = rider speed / camera speed at that point (clamped to 0.1x - 2x);
+- plus a correction of `drift / 2 s` so the frame on screen converges to the rider's position;
+- a seek when the drift exceeds 5 s, a pause below walking pace, and stops in the recording are skipped.
+
 ## Testing
 
 - Swift Testing (`@Test`, `#expect`, parameterised arguments) in every package.
 - Codecs are tested with byte fixtures worked out by hand from the specification tables, encode-decode round trips, and malformed packets that must throw.
 - Random packets from a seeded generator check that no decoder can crash on radio input.
+- Physics values are pinned to an independent reference computation; properties such as "more power is always faster" and "power and speed are inverses" are checked across ranges.
+- Video sync is checked in closed loop: a simulated player that follows the commands converges to the rider's position.
 - View models are tested on Linux against the virtual trainer (from M4).
 - UI tests run on an iOS simulator in CI and record screenshots and a short video (from M4).
 
