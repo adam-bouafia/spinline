@@ -13,6 +13,35 @@ public protocol TrainerConnection: Sendable {
     /// - Throws: ``TrainerError`` when the trainer refuses, does not answer,
     ///   or does not support the command.
     func send(_ command: TrainerCommand) async throws
+
+    /// Closes the connection; every sample stream ends.
+    func disconnect() async
+}
+
+/// A trainer the app can connect to.
+public struct TrainerDevice: Identifiable, Hashable, Sendable {
+    public enum Kind: Hashable, Sendable {
+        case virtual
+        case bluetooth
+    }
+
+    public let id: String
+    public let name: String
+    public let kind: Kind
+
+    public init(id: String, name: String, kind: Kind) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+    }
+}
+
+/// Finds trainers and connects to them: Bluetooth scanning, or the virtual
+/// trainer.
+public protocol TrainerDiscovery: Sendable {
+    /// The devices in reach, updated as they appear and disappear.
+    func devices() async -> AsyncStream<[TrainerDevice]>
+    func connect(to device: TrainerDevice) async throws -> any TrainerConnection
 }
 
 /// What the app can ask a trainer to do.
