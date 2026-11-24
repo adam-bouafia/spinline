@@ -9,11 +9,15 @@ Spinline is an indoor cycling app for smart trainers, written in Swift and Swift
 
 Spinline is built on public Bluetooth SIG specifications (Fitness Machine Service, Heart Rate Service) and its own content. It is an independent personal project and is not affiliated with or endorsed by any trainer manufacturer or app maker.
 
-| Devices | Ride | Workout | Session |
-|---|---|---|---|
-| ![Devices](media/screenshots/devices.png) | ![Ride](media/screenshots/ride.png) | ![Workout](media/screenshots/workout.png) | ![Session](media/screenshots/session.png) |
-
-<img src="media/session.gif" width="240" align="right" alt="A workout session running">
+<p align="center">
+  <img src="media/screenshots/devices.png" width="180" alt="Devices">
+  <img src="media/screenshots/ride.png" width="180" alt="Ride">
+  <img src="media/screenshots/workout.png" width="180" alt="Workout">
+  <img src="media/screenshots/session.png" width="180" alt="Session">
+</p>
+<p align="center">
+  <img src="media/session.gif" width="220" alt="A workout session running in the iOS simulator">
+</p>
 
 The screenshots and the recording come from the iOS simulator in CI, with the app connected to the virtual trainer: the UI test connects, sets an ERG target, opens a workout and rides into its first interval, and a second step records a short session. Every push produces them again as build artifacts.
 
@@ -45,7 +49,7 @@ Early development. The protocol, physics and workout layers come first, because 
 | M3 | Virtual trainer and a command-line ride | done |
 | M4 | SwiftUI app built and tested in CI (iOS simulator) | done |
 | M5 | CoreBluetooth adapter for real trainers | done (not yet tried on hardware) |
-| M6 | Route video synced to the rider's speed | next |
+| M6 | Route video synced to the rider's speed | done (test-pattern route until a filmed one is added) |
 | M7 | Backend from an OpenAPI spec, group ride | planned |
 | M8 | Voice cues, ride export, Mac Catalyst, release 0.1.0 | planned |
 
@@ -56,6 +60,7 @@ Three tabs and a session screen, all SwiftUI:
 - **Devices** lists the virtual trainer and every Bluetooth trainer that advertises the Fitness Machine Service, and connects through the FTMS client.
 - **Ride** shows power, cadence, speed and heart rate live, the current training zone, and ERG control: set a target in 10 W steps or ride free.
 - **Workouts** lists the bundled workouts with a zone-coloured profile chart (Swift Charts) and the step list.
+- **Routes** plays a route video whose speed follows the rider: the trainer's power drives the ride simulator over the route's gradient, `VideoSync` sets the playback rate four times a second, and the gradient goes to the trainer in simulation mode (when it changes by 0.5 % or more, at most once a second). The app ships a test-pattern route (FFmpeg test video, synthetic track) until a filmed route replaces it.
 - **Session** runs a workout: progress, current step and time left, target against measured power, the chart with a marker for now, pause, resume and end. ERG targets go to the trainer as the steps change; free-ride steps release it.
 
 Each screen has an `@Observable` view model in a core target that does not import SwiftUI. The view models are tested on Linux against the virtual trainer, and the SwiftUI views stay thin.
@@ -133,11 +138,14 @@ Packages/
     Devices/       DevicesCore (view model) + DevicesUI (views)
     Ride/          RideCore + RideUI
     Workouts/      WorkoutsCore + WorkoutsUI (list, chart, session)
+    Routes/        RoutesCore + RoutesUI (route video ride)
 tools/
   dev.sh           build, test and lint wrapper used locally and in CI
-  sim/             spinline-sim: ride a workout on the virtual trainer in the terminal
+  sim/             spinline-sim (ride a workout in the terminal) and route-index (GPX to route index)
+  video/           prepare-route.sh (encode a filmed route and index it), make-test-route.sh
 Content/
   Workouts/        workouts shipped with the app (JSON)
+  Routes/          routes shipped with the app: <id>.mp4 and <id>.json
 media/             README screenshots and recording
 .github/
   workflows/       CI: Linux, macOS, iOS simulator
@@ -264,6 +272,8 @@ P * efficiency = v * (m * g * (Crr * cos(a) + sin(a)) + 0.5 * rho * CdA * v^2)
 `CyclingPhysics.steadySpeed(power:grade:)` solves it for speed by bisection; with the defaults (83 kg, Crr 0.004, CdA 0.32 m^2, efficiency 0.97) 200 W on the flat holds 33.9 km/h. `RideSimulator` adds inertia by integrating kinetic energy, which stays stable at zero speed, stops on a climb without rolling back, and starts rolling on a descent steeper than the rolling resistance.
 
 **Workouts.** A `Workout` is a list of steps with targets as fractions of FTP (steady, ramp or free ride), read from JSON with `repeat` blocks for intervals. `WorkoutPlan` resolves it for a rider into a timeline with the target in watts at any second. `ErgTargetTracker` decides when a new ERG target goes to the trainer: only on a change, at most once a second, never dropping a step change.
+
+**Routes from GPS.** `RouteBuilder` turns the GPX track recorded while filming into a `RouteIndex`: cumulative haversine distance, one point per video second, and a gradient measured over 40 m because GPS elevation is noisy. `tools/video/prepare-route.sh` re-encodes the video with a keyframe every second (smooth seeks and rate changes) and runs `route-index`.
 
 **Video sync.** `RouteIndex` maps each second of a route video to the distance along the route and the gradient. `VideoSync` turns the rider's virtual distance and speed into a player command every tick:
 

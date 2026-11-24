@@ -26,6 +26,8 @@ packages:
     path: ../Packages/Features/Ride
   Workouts:
     path: ../Packages/Features/Workouts
+  Routes:
+    path: ../Packages/Features/Routes
 targets:
   Spinline:
     type: application
@@ -33,6 +35,9 @@ targets:
     sources:
       - path: Sources
       - path: ../Content/Workouts
+        type: folder
+        buildPhase: resources
+      - path: ../Content/Routes
         type: folder
         buildPhase: resources
     dependencies:
@@ -52,6 +57,10 @@ targets:
         product: WorkoutsCore
       - package: Workouts
         product: WorkoutsUI
+      - package: Routes
+        product: RoutesCore
+      - package: Routes
+        product: RoutesUI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.adambouafia.spinline

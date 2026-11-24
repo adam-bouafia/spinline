@@ -1,5 +1,6 @@
 import DevicesUI
 import RideUI
+import RoutesUI
 import SwiftUI
 import WorkoutsUI
 
@@ -45,6 +46,28 @@ struct RootView: View {
                 }
             }
             .tabItem { Label("Workouts", systemImage: "list.bullet.rectangle") }
+
+            NavigationStack {
+                List(model.routes) { route in
+                    NavigationLink(value: route.id) {
+                        VStack(alignment: .leading) {
+                            Text(route.name).font(.headline)
+                            Text(String(format: "%.1f km", route.index.totalDistance / 1000))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("route-\(route.id)")
+                }
+                .navigationTitle("Routes")
+                .navigationDestination(for: String.self) { id in
+                    if let route = model.routes.first(where: { $0.id == id }), let ride = model.makeRouteRide(route) {
+                        RouteRideView(viewModel: ride, videoURL: route.videoURL)
+                    } else {
+                        ContentUnavailableView("No trainer", systemImage: "bicycle")
+                    }
+                }
+            }
+            .tabItem { Label("Routes", systemImage: "map") }
         }
     }
 }
