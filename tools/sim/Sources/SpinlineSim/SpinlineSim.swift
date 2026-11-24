@@ -55,21 +55,14 @@ struct SpinlineSim: AsyncParsableCommand {
         print("\(plan.workout.name): \(format(seconds: plan.duration)), FTP \(ftp) W, virtual trainer")
         print(Line.header)
 
-        var tracker = ErgTargetTracker()
-        var inErg = false
+        var controller = WorkoutController(plan: plan)
         var summary = Summary()
         var lastStep = -1
         for second in 0..<plan.duration {
             let elapsed = Double(second)
             guard let position = plan.position(at: elapsed) else { break }
-            if position.targetPower == nil, inErg {
-                // A free-ride step: release ERG so the rider's own effort counts.
-                try await client.send(.setSimulation(grade: 0, windSpeed: 0))
-                tracker.reset()
-                inErg = false
-            } else if let watts = tracker.update(target: position.targetPower, at: elapsed) {
-                try await client.send(.setTargetPower(watts: watts))
-                inErg = true
+            for command in controller.commands(at: elapsed) {
+                try await client.send(command)
             }
 
             await trainer.advance(by: 1)
