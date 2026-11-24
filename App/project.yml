@@ -1,0 +1,79 @@
+# XcodeGen spec for the iOS app. The .xcodeproj is generated (CI runs
+# `xcodegen generate`) and never committed.
+name: Spinline
+options:
+  bundleIdPrefix: io.github.adambouafia
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  Domain:
+    path: ../Packages/Domain
+  RideEngine:
+    path: ../Packages/RideEngine
+  VirtualTrainer:
+    path: ../Packages/VirtualTrainer
+  Devices:
+    path: ../Packages/Features/Devices
+  Ride:
+    path: ../Packages/Features/Ride
+  Workouts:
+    path: ../Packages/Features/Workouts
+targets:
+  Spinline:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: ../Content/Workouts
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: Domain
+      - package: RideEngine
+      - package: VirtualTrainer
+      - package: Devices
+        product: DevicesCore
+      - package: Devices
+        product: DevicesUI
+      - package: Ride
+        product: RideCore
+      - package: Ride
+        product: RideUI
+      - package: Workouts
+        product: WorkoutsCore
+      - package: Workouts
+        product: WorkoutsUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.adambouafia.spinline
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Spinline
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: Spinline connects to your smart trainer and heart-rate strap over Bluetooth.
+        TARGETED_DEVICE_FAMILY: "1,2"
+    scheme:
+      testTargets:
+        - SpinlineUITests
+  SpinlineUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Spinline
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.adambouafia.spinline.uitests
+        TEST_TARGET_NAME: Spinline
+        # XCUIApplication is main-actor only; Swift 5 mode keeps UI tests in
+        # the shape of Apple's template.
+        SWIFT_VERSION: "5.0"
