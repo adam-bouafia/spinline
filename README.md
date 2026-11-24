@@ -44,8 +44,8 @@ Early development. The protocol, physics and workout layers come first, because 
 | M2 | RideEngine: ride physics, workouts, video rate | done |
 | M3 | Virtual trainer and a command-line ride | done |
 | M4 | SwiftUI app built and tested in CI (iOS simulator) | done |
-| M5 | CoreBluetooth adapter for real trainers | next |
-| M6 | Route video synced to the rider's speed | planned |
+| M5 | CoreBluetooth adapter for real trainers | done (not yet tried on hardware) |
+| M6 | Route video synced to the rider's speed | next |
 | M7 | Backend from an OpenAPI spec, group ride | planned |
 | M8 | Voice cues, ride export, Mac Catalyst, release 0.1.0 | planned |
 
@@ -53,7 +53,7 @@ Early development. The protocol, physics and workout layers come first, because 
 
 Three tabs and a session screen, all SwiftUI:
 
-- **Devices** lists trainers in reach (today the virtual trainer; Bluetooth trainers from M5) and connects through the FTMS client.
+- **Devices** lists the virtual trainer and every Bluetooth trainer that advertises the Fitness Machine Service, and connects through the FTMS client.
 - **Ride** shows power, cadence, speed and heart rate live, the current training zone, and ERG control: set a target in 10 W steps or ride free.
 - **Workouts** lists the bundled workouts with a zone-coloured profile chart (Swift Charts) and the step list.
 - **Session** runs a workout: progress, current step and time left, target against measured power, the chart with a marker for now, pause, resume and end. ERG targets go to the trainer as the steps change; free-ride steps release it.
@@ -247,7 +247,9 @@ Decoders never crash on bad input: a test feeds every decoder 20,000 random pack
 - after Control Permission Lost, or a Control Not Permitted answer, it requests control again;
 - ERG targets are clamped to the trainer's supported power range, and commands the trainer does not support are refused before anything is written.
 
-`VirtualTrainer` implements `GATTTransport` in memory as an FTMS server with a virtual rider: power follows the ERG target with a lag, speed comes from the ride simulator on the simulated gradient, heart rate drifts with effort. It answers malformed writes, unknown op codes, missing control and missing subscriptions the way the specification requires. The CoreBluetooth adapter (M5) implements the same protocol, so the client code is identical for both.
+`CoreBluetoothTransport` implements `GATTTransport` over a `CBPeripheral`: all state lives on one dispatch queue, and each delegate callback resumes the waiting read, write or subscription, or yields a notification. `BluetoothTrainerDiscovery` scans for service `0x1826`, connects, discovers the characteristics and hands the transport to `FTMSTrainer`. It compiles and its UUID mapping is tested on macOS in CI; it has not yet been run against a physical trainer, because none was available. The heart-rate strap codec exists, its Bluetooth wiring does not yet.
+
+`VirtualTrainer` implements `GATTTransport` in memory as an FTMS server with a virtual rider: power follows the ERG target with a lag, speed comes from the ride simulator on the simulated gradient, heart rate drifts with effort. It answers malformed writes, unknown op codes, missing control and missing subscriptions the way the specification requires. The CoreBluetooth transport implements the same protocol, so the client code is identical for both.
 
 ## Ride engine
 

@@ -16,6 +16,8 @@ packages:
     path: ../Packages/Domain
   RideEngine:
     path: ../Packages/RideEngine
+  TrainerKit:
+    path: ../Packages/TrainerKit
   VirtualTrainer:
     path: ../Packages/VirtualTrainer
   Devices:
@@ -36,6 +38,7 @@ targets:
     dependencies:
       - package: Domain
       - package: RideEngine
+      - package: TrainerKit
       - package: VirtualTrainer
       - package: Devices
         product: DevicesCore
