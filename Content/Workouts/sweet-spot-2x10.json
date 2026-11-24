@@ -1,0 +1,12 @@
+{
+  "id": "sweet-spot-2x10",
+  "name": "Sweet spot 2 x 10",
+  "steps": [
+    { "label": "Warm-up", "seconds": 600, "ramp": { "from": 0.45, "to": 0.75 } },
+    { "repeat": 2, "steps": [
+      { "label": "Sweet spot", "seconds": 600, "power": 0.9, "cadence": 90 },
+      { "label": "Recovery", "seconds": 300, "power": 0.5 }
+    ] },
+    { "label": "Cool-down", "seconds": 300, "ramp": { "from": 0.55, "to": 0.4 } }
+  ]
+}
