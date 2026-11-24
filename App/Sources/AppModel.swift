@@ -4,6 +4,7 @@ import Foundation
 import Observation
 import RideCore
 import RideEngine
+import TrainerKit
 import VirtualTrainer
 import WorkoutsCore
 
@@ -27,7 +28,15 @@ final class AppModel {
             configuration: VirtualTrainer.Configuration(rider: virtualRider),
             timeScale: launch.timeScale
         )
-        devices = DevicesViewModel(discovery: discovery)
+        // UI tests and demos use only the virtual trainer, so they never depend
+        // on the Bluetooth hardware of the machine they run on.
+        if launch.autoConnect {
+            devices = DevicesViewModel(discovery: discovery)
+        } else {
+            devices = DevicesViewModel(
+                discovery: CombinedDiscovery(virtual: discovery, bluetooth: BluetoothTrainerDiscovery())
+            )
+        }
         workouts = Self.bundledWorkouts()
     }
 
