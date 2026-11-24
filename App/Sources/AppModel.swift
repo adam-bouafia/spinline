@@ -4,6 +4,7 @@ import Foundation
 import Observation
 import RideCore
 import RideEngine
+import RoutesCore
 import TrainerKit
 import VirtualTrainer
 import WorkoutsCore
@@ -16,6 +17,7 @@ final class AppModel {
     let rider = RiderProfile(riderMass: 75, bikeMass: 8, ftp: 250)
     let devices: DevicesViewModel
     let workouts: [Workout]
+    let routes: [BundledRoute]
     private(set) var ride: RideViewModel?
     private(set) var session: WorkoutSessionViewModel?
 
@@ -38,6 +40,7 @@ final class AppModel {
             )
         }
         workouts = Self.bundledWorkouts()
+        routes = BundledRoute.all()
     }
 
     var isConnected: Bool { devices.connection != nil }
@@ -70,6 +73,11 @@ final class AppModel {
             connection: connection,
             timeScale: launch.timeScale
         )
+    }
+
+    func makeRouteRide(_ route: BundledRoute) -> RouteRideViewModel? {
+        guard let connection = devices.connection else { return nil }
+        return RouteRideViewModel(name: route.name, route: route.index, connection: connection, rider: rider)
     }
 
     func closeSession() {

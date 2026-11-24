@@ -45,6 +45,24 @@ final class SpinlineUITests: XCTestCase {
     }
 
     @MainActor
+    func testRideARoute() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        XCTAssertTrue(app.buttons["disconnect-virtual-trainer"].waitForExistence(timeout: 15))
+
+        app.tabBars.buttons["Routes"].tap()
+        let route = app.buttons["route-test-pattern"]
+        XCTAssertTrue(route.waitForExistence(timeout: 10))
+        route.tap()
+        let start = app.buttons["route-start"]
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.tap()
+        sleep(8)
+        snapshot(app, "5-route")
+    }
+
+    @MainActor
     private func wait(for element: XCUIElement, label: String, timeout: TimeInterval) {
         let predicate = NSPredicate(format: "label == %@", label)
         let found = XCTNSPredicateExpectation(predicate: predicate, object: element)
