@@ -104,8 +104,8 @@ run)
     shift 2
     capped swift run --package-path "$dir" "$product" "$@"
     ;;
-lint) capped swift format lint --strict --recursive --parallel "$root/Packages" "$root/tools" ;;
-format) capped swift format --in-place --recursive --parallel "$root/Packages" "$root/tools" ;;
+lint) capped swift format lint --strict --recursive --parallel "$root/Packages" "$root/tools" "$root/App" ;;
+format) capped swift format --in-place --recursive --parallel "$root/Packages" "$root/tools" "$root/App" ;;
 packages) packages | sed "s|^$root/||" ;;
 swift) capped swift "$@" ;;
 *) sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;

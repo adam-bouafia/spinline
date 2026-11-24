@@ -24,3 +24,6 @@ DerivedData/
 # Raw media (processed route videos are published separately)
 /media/raw/
 *.mov
+
+# Build output (CI artifacts, local xcodebuild)
+/build/

@@ -9,9 +9,18 @@ Spinline is an indoor cycling app for smart trainers, written in Swift and Swift
 
 Spinline is built on public Bluetooth SIG specifications (Fitness Machine Service, Heart Rate Service) and its own content. It is an independent personal project and is not affiliated with or endorsed by any trainer manufacturer or app maker.
 
+| Devices | Ride | Workout | Session |
+|---|---|---|---|
+| ![Devices](media/screenshots/devices.png) | ![Ride](media/screenshots/ride.png) | ![Workout](media/screenshots/workout.png) | ![Session](media/screenshots/session.png) |
+
+<img src="media/session.gif" width="240" align="right" alt="A workout session running">
+
+The screenshots and the recording come from the iOS simulator in CI, with the app connected to the virtual trainer: the UI test connects, sets an ERG target, opens a workout and rides into its first interval, and a second step records a short session. Every push produces them again as build artifacts.
+
 ## Contents
 
 - [Status](#status)
+- [The app](#the-app)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Repository layout](#repository-layout)
@@ -34,11 +43,22 @@ Early development. The protocol, physics and workout layers come first, because 
 | M1 | TrainerKit: FTMS and heart-rate codecs | done |
 | M2 | RideEngine: ride physics, workouts, video rate | done |
 | M3 | Virtual trainer and a command-line ride | done |
-| M4 | SwiftUI app built and tested in CI (iOS simulator) | next |
-| M5 | CoreBluetooth adapter for real trainers | planned |
+| M4 | SwiftUI app built and tested in CI (iOS simulator) | done |
+| M5 | CoreBluetooth adapter for real trainers | next |
 | M6 | Route video synced to the rider's speed | planned |
 | M7 | Backend from an OpenAPI spec, group ride | planned |
 | M8 | Voice cues, ride export, Mac Catalyst, release 0.1.0 | planned |
+
+## The app
+
+Three tabs and a session screen, all SwiftUI:
+
+- **Devices** lists trainers in reach (today the virtual trainer; Bluetooth trainers from M5) and connects through the FTMS client.
+- **Ride** shows power, cadence, speed and heart rate live, the current training zone, and ERG control: set a target in 10 W steps or ride free.
+- **Workouts** lists the bundled workouts with a zone-coloured profile chart (Swift Charts) and the step list.
+- **Session** runs a workout: progress, current step and time left, target against measured power, the chart with a marker for now, pause, resume and end. ERG targets go to the trainer as the steps change; free-ride steps release it.
+
+Each screen has an `@Observable` view model in a core target that does not import SwiftUI. The view models are tested on Linux against the virtual trainer, and the SwiftUI views stay thin.
 
 ## Features
 
@@ -99,28 +119,38 @@ Rules that keep the layers honest:
 ## Repository layout
 
 ```
+App/
+  project.yml      XcodeGen spec: the iOS app target and its UI test target
+  Sources/         SpinlineApp, AppModel (composition root), RootView
+  UITests/         end-to-end UI test against the virtual trainer
 Packages/
-  Domain/          entities (TrainerSample, Workout, RiderProfile) and the TrainerConnection protocol
+  Domain/          entities (TrainerSample, Workout, RiderProfile, PowerZone), TrainerConnection, TrainerDiscovery
   TrainerKit/      FTMS and heart-rate codecs, GATT transport protocol, FTMS client
-  RideEngine/      ride physics, workout timeline, ERG target pacing, video sync
-  VirtualTrainer/  an FTMS trainer in software, with a virtual rider
+  RideEngine/      ride physics, workout timeline and controller, ERG target pacing, video sync
+  VirtualTrainer/  an FTMS trainer in software, with a virtual rider, and its discovery
+  DesignSystem/    colours, typography, metric tile (SwiftUI)
+  Features/
+    Devices/       DevicesCore (view model) + DevicesUI (views)
+    Ride/          RideCore + RideUI
+    Workouts/      WorkoutsCore + WorkoutsUI (list, chart, session)
 tools/
   dev.sh           build, test and lint wrapper used locally and in CI
   sim/             spinline-sim: ride a workout on the virtual trainer in the terminal
 Content/
-  Workouts/        sample workouts (JSON)
+  Workouts/        workouts shipped with the app (JSON)
+media/             README screenshots and recording
 .github/
-  workflows/       CI on Linux and macOS
+  workflows/       CI: Linux, macOS, iOS simulator
 ```
 
-Feature packages, the app target, the server and the OpenAPI specification are added as the milestones above land.
+Every UI target wraps its sources in `#if canImport(SwiftUI)`, so the whole package graph builds on Linux and the UI compiles on Apple platforms. The `.xcodeproj` is generated, never committed. The server and the OpenAPI specification arrive in M7.
 
 ## Getting started
 
 Requirements:
 
 - Swift 6.0 or newer. Developed with Swift 6.3 on Linux and Xcode on macOS.
-- For the iOS app (from M4): Xcode with the iOS 17 SDK or newer, and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+- For the iOS app: macOS with Xcode 16 or newer (iOS 17 SDK or newer) and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 Clone and run the tests:
 
@@ -152,6 +182,16 @@ Workout complete: 07:30, 3.84 km, average 169 W, 30.7 km/h, max HR 167
 ```
 
 The first second of each step shows the trainer catching up with the new target. Add `--speed 10` to ride at ten times real time instead of as fast as possible; `--help` lists all options.
+
+Build and run the iOS app on macOS:
+
+```bash
+brew install xcodegen
+xcodegen generate --spec App/project.yml
+open App/Spinline.xcodeproj    # run the Spinline scheme on an iPhone simulator
+```
+
+The app connects to the virtual trainer from the Devices tab. Launch arguments for testing: `-uiTesting` connects at launch and runs time ten times faster; `-demoWorkout <id>` also starts that workout.
 
 Each package also works with plain SwiftPM:
 
@@ -237,8 +277,8 @@ P * efficiency = v * (m * g * (Crr * cos(a) + sin(a)) + 0.5 * rho * CdA * v^2)
 - Physics values are pinned to an independent reference computation; properties such as "more power is always faster" and "power and speed are inverses" are checked across ranges.
 - Video sync is checked in closed loop: a simulated player that follows the commands converges to the rider's position.
 - The FTMS client is tested against the virtual trainer: ERG convergence, simulated climbs, lost control (announced and silent), concurrent commands, clamping, dropped links and timeouts.
-- View models are tested on Linux against the virtual trainer (from M4).
-- UI tests run on an iOS simulator in CI and record screenshots and a short video (from M4).
+- View models are tested on Linux against the virtual trainer: ERG control, refused commands, zones, workout sessions step by step, pause, a lost trainer, a full session at 200 times real time.
+- One XCUITest drives the app on an iOS simulator in CI: connect, ERG, open a workout, ride into the first interval. It attaches a screenshot of each screen.
 
 ## Continuous integration
 
@@ -247,7 +287,8 @@ GitHub Actions runs on every push to `develop` and `main` and on every pull requ
 | Job | Runner | Steps |
 |---|---|---|
 | Linux | `swift:6.3-noble` container | `swift format lint --strict`, test every package, ride a workout with `spinline-sim` |
-| macOS | `macos-15` with Xcode | test every package, ride a workout with `spinline-sim` |
+| macOS | `macos-15` with Xcode | test every package (the SwiftUI targets compile here), ride a workout with `spinline-sim` |
+| iOS app | `macos-15`, iOS simulator | `xcodegen generate`, `xcodebuild test` with the UI test, export screenshots, record a demo video; all uploaded as artifacts |
 
 A Jenkinsfile with the same stages follows in M8.
 
