@@ -7,6 +7,7 @@
 #
 # Usage:
 #   tools/dev.sh test  [Package...]        test every package, or the ones named
+#                                          (packages without tests are built)
 #   tools/dev.sh build [Package...]        build every package, or the ones named
 #   tools/dev.sh run   <Package> <product> [args...]
 #   tools/dev.sh lint                      swift format lint (strict)
@@ -80,9 +81,15 @@ for_each_package() {
             dirs+=("$(package_dir "$name")")
         done
     fi
+    local run
     for dir in "${dirs[@]}"; do
-        echo "==> swift $action: ${dir#"$root"/}"
-        capped swift "$action" --package-path "$dir"
+        run=$action
+        # swift test fails on a package without tests (tools); build it instead.
+        if [[ $action == test && ! -d $dir/Tests ]]; then
+            run=build
+        fi
+        echo "==> swift $run: ${dir#"$root"/}"
+        capped swift "$run" --package-path "$dir"
     done
 }
 
@@ -101,5 +108,5 @@ lint) capped swift format lint --strict --recursive --parallel "$root/Packages" 
 format) capped swift format --in-place --recursive --parallel "$root/Packages" "$root/tools" ;;
 packages) packages | sed "s|^$root/||" ;;
 swift) capped swift "$@" ;;
-*) sed -n '2,21p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+*) sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
 esac

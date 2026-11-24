@@ -33,8 +33,8 @@ Early development. The protocol, physics and workout layers come first, because 
 | M0 | Repository, packages, toolchain, CI | done |
 | M1 | TrainerKit: FTMS and heart-rate codecs | done |
 | M2 | RideEngine: ride physics, workouts, video rate | done |
-| M3 | Virtual trainer and a command-line ride | in progress |
-| M4 | SwiftUI app built and tested in CI (iOS simulator) | planned |
+| M3 | Virtual trainer and a command-line ride | done |
+| M4 | SwiftUI app built and tested in CI (iOS simulator) | next |
 | M5 | CoreBluetooth adapter for real trainers | planned |
 | M6 | Route video synced to the rider's speed | planned |
 | M7 | Backend from an OpenAPI spec, group ride | planned |
@@ -100,13 +100,17 @@ Rules that keep the layers honest:
 
 ```
 Packages/
-  Domain/        entities, use cases, repository protocols
-  TrainerKit/    FTMS and heart-rate codecs, virtual trainer, CoreBluetooth adapter
-  RideEngine/    ride physics, workout engine, video rate mapping
+  Domain/          entities (TrainerSample, Workout, RiderProfile) and the TrainerConnection protocol
+  TrainerKit/      FTMS and heart-rate codecs, GATT transport protocol, FTMS client
+  RideEngine/      ride physics, workout timeline, ERG target pacing, video sync
+  VirtualTrainer/  an FTMS trainer in software, with a virtual rider
 tools/
-  dev.sh         build, test and lint wrapper used locally and in CI
+  dev.sh           build, test and lint wrapper used locally and in CI
+  sim/             spinline-sim: ride a workout on the virtual trainer in the terminal
+Content/
+  Workouts/        sample workouts (JSON)
 .github/
-  workflows/     CI on Linux and macOS
+  workflows/       CI on Linux and macOS
 ```
 
 Feature packages, the app target, the server and the OpenAPI specification are added as the milestones above land.
@@ -127,6 +131,27 @@ tools/dev.sh test             # every package
 tools/dev.sh test TrainerKit  # one package
 tools/dev.sh lint             # swift format, strict
 ```
+
+Ride a workout on the virtual trainer, through the real FTMS client:
+
+```bash
+tools/dev.sh run sim spinline-sim --workout Content/Workouts/openers.json --ftp 250
+```
+
+```
+Openers: 07:30, FTP 250 W, virtual trainer
+ time step            target   power  cadence     speed   HR
+00:00 Warm-up          125 W    61 W   90 rpm  3.3 km/h   61
+00:30 Warm-up          138 W   137 W   90 rpm 25.9 km/h  101
+...
+05:00 Opener           300 W   210 W   90 rpm 28.9 km/h  114
+05:30 Easy             125 W   215 W   90 rpm 38.2 km/h  164
+06:00 Easy             125 W   125 W   90 rpm 30.0 km/h  123
+06:30 Spin              free   137 W   90 rpm 28.6 km/h  113
+Workout complete: 07:30, 3.84 km, average 169 W, 30.7 km/h, max HR 167
+```
+
+The first second of each step shows the trainer catching up with the new target. Add `--speed 10` to ride at ten times real time instead of as fast as possible; `--help` lists all options.
 
 Each package also works with plain SwiftPM:
 
@@ -173,6 +198,17 @@ Points where the specifications disagree, and what the code does:
 
 Decoders never crash on bad input: a test feeds every decoder 20,000 random packets from a seeded generator.
 
+### Client and virtual trainer
+
+`GATTTransport` is the boundary between the protocol and the radio: values (notifications and indications), read, write with response, and subscribe. `FTMSTrainer` is the FTMS client on top of it and implements the Domain's `TrainerConnection`:
+
+- on connect it reads the feature and power range, subscribes to Indoor Bike Data, Fitness Machine Status and control point indications, then requests control;
+- it runs one control point procedure at a time (actors are reentrant, so commands go through an explicit queue), waits for the indication that answers each write, and times out;
+- after Control Permission Lost, or a Control Not Permitted answer, it requests control again;
+- ERG targets are clamped to the trainer's supported power range, and commands the trainer does not support are refused before anything is written.
+
+`VirtualTrainer` implements `GATTTransport` in memory as an FTMS server with a virtual rider: power follows the ERG target with a lag, speed comes from the ride simulator on the simulated gradient, heart rate drifts with effort. It answers malformed writes, unknown op codes, missing control and missing subscriptions the way the specification requires. The CoreBluetooth adapter (M5) implements the same protocol, so the client code is identical for both.
+
 ## Ride engine
 
 `RideEngine` is pure Swift and has no knowledge of Bluetooth or the screen.
@@ -200,6 +236,7 @@ P * efficiency = v * (m * g * (Crr * cos(a) + sin(a)) + 0.5 * rho * CdA * v^2)
 - Random packets from a seeded generator check that no decoder can crash on radio input.
 - Physics values are pinned to an independent reference computation; properties such as "more power is always faster" and "power and speed are inverses" are checked across ranges.
 - Video sync is checked in closed loop: a simulated player that follows the commands converges to the rider's position.
+- The FTMS client is tested against the virtual trainer: ERG convergence, simulated climbs, lost control (announced and silent), concurrent commands, clamping, dropped links and timeouts.
 - View models are tested on Linux against the virtual trainer (from M4).
 - UI tests run on an iOS simulator in CI and record screenshots and a short video (from M4).
 
@@ -209,8 +246,8 @@ GitHub Actions runs on every push to `develop` and `main` and on every pull requ
 
 | Job | Runner | Steps |
 |---|---|---|
-| Linux | `swift:6.3-noble` container | `swift format lint --strict`, test every package |
-| macOS | `macos-15` with Xcode | test every package |
+| Linux | `swift:6.3-noble` container | `swift format lint --strict`, test every package, ride a workout with `spinline-sim` |
+| macOS | `macos-15` with Xcode | test every package, ride a workout with `spinline-sim` |
 
 A Jenkinsfile with the same stages follows in M8.
 

@@ -27,6 +27,8 @@ jobs:
         run: tools/dev.sh lint
       - name: Test
         run: tools/dev.sh test
+      - name: Ride a workout on the virtual trainer
+        run: tools/dev.sh run sim spinline-sim --workout Content/Workouts/openers.json --every 60
 
   macos:
     name: macOS (Xcode)
@@ -38,3 +40,5 @@ jobs:
         run: xcodebuild -version && swift --version
       - name: Test
         run: tools/dev.sh test
+      - name: Ride a workout on the virtual trainer
+        run: tools/dev.sh run sim spinline-sim --workout Content/Workouts/openers.json --every 60
