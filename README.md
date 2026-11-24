@@ -10,16 +10,17 @@ Spinline is an indoor cycling app for smart trainers, written in Swift and Swift
 Spinline is built on public Bluetooth SIG specifications (Fitness Machine Service, Heart Rate Service) and its own content. It is an independent personal project and is not affiliated with or endorsed by any trainer manufacturer or app maker.
 
 <p align="center">
-  <img src="media/screenshots/devices.png" width="180" alt="Devices">
-  <img src="media/screenshots/ride.png" width="180" alt="Ride">
-  <img src="media/screenshots/workout.png" width="180" alt="Workout">
-  <img src="media/screenshots/session.png" width="180" alt="Session">
+  <img src="media/screenshots/devices.png" width="150" alt="Devices">
+  <img src="media/screenshots/ride.png" width="150" alt="Ride">
+  <img src="media/screenshots/workout.png" width="150" alt="Workout">
+  <img src="media/screenshots/session.png" width="150" alt="Session">
+  <img src="media/screenshots/route.png" width="150" alt="Route">
 </p>
 <p align="center">
   <img src="media/session.gif" width="220" alt="A workout session running in the iOS simulator">
 </p>
 
-The screenshots and the recording come from the iOS simulator in CI, with the app connected to the virtual trainer: the UI test connects, sets an ERG target, opens a workout and rides into its first interval, and a second step records a short session. Every push produces them again as build artifacts.
+The screenshots and the recording come from the iOS simulator in CI, with the app connected to the virtual trainer: the UI tests connect, set an ERG target, ride into the first interval of a workout and ride the test route, and a second step records a short session. Every push produces them again as build artifacts.
 
 ## Contents
 
@@ -51,7 +52,7 @@ Early development. The protocol, physics and workout layers come first, because 
 | M5 | CoreBluetooth adapter for real trainers | done (not yet tried on hardware) |
 | M6 | Route video synced to the rider's speed | done (test-pattern route until a filmed one is added) |
 | M7 | Backend from an OpenAPI spec, group ride | planned |
-| M8 | Voice cues, ride export, Mac Catalyst, release 0.1.0 | planned |
+| M8 | Mac Catalyst, Jenkinsfile, release 0.1.0 | done; voice cues and ride export planned |
 
 ## The app
 
@@ -75,7 +76,7 @@ Each screen has an `@Observable` view model in a core target that does not impor
 - **Group ride.** Riders on the same route see each other on an elevation profile, over WebSockets.
 - **Backend.** Routes, workouts and ride uploads behind an OpenAPI specification; client and server code are generated from the same file.
 - **Export.** Rides saved as FIT files for upload to training platforms.
-- **Mac.** The same app on macOS through Mac Catalyst.
+- **Mac.** The same app on macOS through Mac Catalyst (built in CI).
 
 ## Architecture
 
@@ -300,9 +301,10 @@ GitHub Actions runs on every push to `develop` and `main` and on every pull requ
 |---|---|---|
 | Linux | `swift:6.3-noble` container | `swift format lint --strict`, test every package, ride a workout with `spinline-sim` |
 | macOS | `macos-15` with Xcode | test every package (the SwiftUI targets compile here), ride a workout with `spinline-sim` |
-| iOS app | `macos-15`, iOS simulator | `xcodegen generate`, `xcodebuild test` with the UI test, export screenshots, record a demo video; all uploaded as artifacts |
+| iOS app | `macos-15`, iOS simulator | `xcodegen generate`, `xcodebuild test` with the UI tests, export screenshots, record a demo video; all uploaded as artifacts |
+| Mac Catalyst | `macos-15` | build the same app target for Mac |
 
-A Jenkinsfile with the same stages follows in M8.
+The `Jenkinsfile` runs the Linux stages (lint, test, sim ride) in the same `swift:6.3-noble` image, for teams on Jenkins; the Apple stages need a macOS agent with Xcode.
 
 ## Branching and releases
 
@@ -313,7 +315,7 @@ The repository follows GitFlow:
 - Releases are cut on `release/x.y.z`, merged into `main` and tagged `vx.y.z`.
 - Urgent fixes go on `hotfix/*` from `main`.
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/). Changes per release are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Non-goals
 
