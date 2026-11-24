@@ -109,3 +109,23 @@ jobs:
             build/demo.mp4
             build/xcodebuild.log
           if-no-files-found: warn
+
+  catalyst:
+    name: Mac Catalyst
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec App/project.yml
+      - name: Build for Mac Catalyst
+        run: |
+          xcodebuild build \
+            -project App/Spinline.xcodeproj \
+            -scheme Spinline \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
+            CODE_SIGNING_ALLOWED=NO > catalyst.log 2>&1 \
+            || { grep -E "error:" catalyst.log | head -40; tail -40 catalyst.log; exit 1; }
+          tail -3 catalyst.log
