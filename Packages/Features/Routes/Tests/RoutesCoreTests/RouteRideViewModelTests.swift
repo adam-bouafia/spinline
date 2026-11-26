@@ -47,7 +47,8 @@ struct RouteRideViewModelTests {
             if case .play(let rate) = ride.command { videoTime += rate }
         }
         #expect(ride.distance > 100)
-        #expect(abs(route.videoTime(atDistance: ride.distance) - videoTime) < 1.5)
+        // With 1 s steps the player trails by up to one step at the maximum rate (2x).
+        #expect(abs(route.videoTime(atDistance: ride.distance) - videoTime) < 2.5)
     }
 
     @Test func theClimbReachesTheTrainer() async throws {
