@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux (Swift 6.3)
+    runs-on: ubuntu-24.04
+    container: swift:6.3-noble
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - name: Toolchain
+        run: swift --version
+      - name: Lint
+        run: tools/dev.sh lint
+      - name: Test
+        run: tools/dev.sh test
+      - name: Ride a workout on the virtual trainer
+        run: tools/dev.sh run sim spinline-sim --workout Content/Workouts/openers.json --every 60
+
+  macos:
+    name: macOS (Xcode)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Toolchain
+        run: xcodebuild -version && swift --version
+      - name: Test
+        run: tools/dev.sh test
+      - name: Ride a workout on the virtual trainer
+        run: tools/dev.sh run sim spinline-sim --workout Content/Workouts/openers.json --every 60
+
+  app:
+    name: iOS app (simulator)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Toolchain
+        run: xcodebuild -version
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec App/project.yml
+      - name: Pick a simulator
+        id: simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in devices if "iOS" in r), reverse=True)
+          print(next(d["udid"] for r in runtimes for d in devices[r] if d["name"].startswith("iPhone")))
+          ')
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices available | grep "$udid"
+      - name: Build and run the UI test
+        run: |
+          mkdir -p build
+          xcodebuild test \
+            -project App/Spinline.xcodeproj \
+            -scheme Spinline \
+            -destination "id=${{ steps.simulator.outputs.udid }}" \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/Spinline.xcresult \
+            CODE_SIGNING_ALLOWED=NO > build/xcodebuild.log 2>&1 \
+            || { grep -E "error:|failed|Fail" build/xcodebuild.log | head -50; tail -80 build/xcodebuild.log; exit 1; }
+          grep -E "Test Case|Executed|\*\* TEST" build/xcodebuild.log
+      - name: Export screenshots
+        if: always()
+        run: |
+          mkdir -p build/screenshots
+          xcrun xcresulttool export attachments --path build/Spinline.xcresult --output-path build/screenshots || true
+          ls -la build/screenshots
+      - name: Record a demo video
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          xcrun simctl boot "$UDID" 2>/dev/null || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" build/DerivedData/Build/Products/Debug-iphonesimulator/Spinline.app
+          xcrun simctl io "$UDID" recordVideo --codec h264 --force build/demo.mp4 &
+          recorder=$!
+          sleep 3
+          xcrun simctl launch "$UDID" io.github.adambouafia.spinline -demoWorkout openers
+          sleep 70
+          kill -INT "$recorder"
+          wait "$recorder" || true
+          ls -la build/demo.mp4
+      - name: Upload screenshots, video and log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: |
+            build/screenshots
+            build/demo.mp4
+            build/xcodebuild.log
+          if-no-files-found: warn
+
+  catalyst:
+    name: Mac Catalyst
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec App/project.yml
+      - name: Build for Mac Catalyst
+        run: |
+          xcodebuild build \
+            -project App/Spinline.xcodeproj \
+            -scheme Spinline \
+            -destination 'platform=macOS,variant=Mac Catalyst' \
+            CODE_SIGNING_ALLOWED=NO > catalyst.log 2>&1 \
+            || { grep -E "error:" catalyst.log | head -40; tail -40 catalyst.log; exit 1; }
+          tail -3 catalyst.log

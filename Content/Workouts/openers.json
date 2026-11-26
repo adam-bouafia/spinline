@@ -1,0 +1,12 @@
+{
+  "id": "openers",
+  "name": "Openers",
+  "steps": [
+    { "label": "Warm-up", "seconds": 120, "ramp": { "from": 0.5, "to": 0.7 } },
+    { "repeat": 3, "steps": [
+      { "label": "Opener", "seconds": 30, "power": 1.2, "cadence": 100 },
+      { "label": "Easy", "seconds": 60, "power": 0.5 }
+    ] },
+    { "label": "Spin", "seconds": 60 }
+  ]
+}
